@@ -1,0 +1,89 @@
+services:
+  vote:
+    build:
+      context: ./vote
+      target: dev
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+     - ./vote:/usr/local/app
+    ports:
+      - "5003:80"
+    networks:
+      - humansbestfriend-network
+
+  result:
+    build: ./result
+    entrypoint: nodemon --inspect=0.0.0.0 server.js
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./result:/usr/local/app
+    ports:
+      - "5001:80"
+      - "127.0.0.1:9229:9229"
+    networks:
+      - humansbestfriend-network
+
+  worker:
+    build:
+      context: ./worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - humansbestfriend-network
+
+  redis:
+    image: localhost:5000/redis:latest
+    environment:
+      REDIS_HOST: "Db_redis"
+    volumes:
+      - "./healthchecks:/healthchecks"
+    healthcheck:
+      test: /healthchecks/redis.sh
+      interval: "5s"
+    networks:
+      - humansbestfriend-network
+
+  db:
+    image: localhost:5000/postgres:15-alpine
+    environment:
+      POSTGRES_HOST: "db"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DBNAME: "db_tp"
+    volumes:
+      - "db-data:/var/lib/postgresql/data"
+      - "./healthchecks:/healthchecks"
+    healthcheck:
+      test: /healthchecks/postgres.sh
+      interval: "5s"
+    networks:
+      - humansbestfriend-network
+
+  seed:
+    build: ./seed-data
+    profiles: ["seed"]
+    depends_on:
+      vote:
+        condition: service_healthy
+    networks:
+      - humansbestfriend-network
+    restart: "no"
+
+volumes:
+  db-data:
+
+networks:
+  humansbestfriend-network:	

@@ -1,0 +1,60 @@
+services:
+  vote:
+    image: humans-best-friend-vote
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5003:80"
+    networks:
+      - humansbestfriend-network
+
+  result:
+    image: humans-best-friend-result
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5001:80"
+    networks:
+      - humansbestfriend-network
+
+  worker:
+    image: humans-best-friend-worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - humansbestfriend-network
+
+  redis:
+    image: localhost:5000/redis:latest
+    volumes:
+      - "./healthchecks:/healthchecks"
+    healthcheck:
+      test: /healthchecks/redis.sh
+      interval: "5s"
+    networks:
+      - humansbestfriend-network
+
+  db:
+    image: localhost:5000/postgres:15-alpine
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    volumes:
+      - "db-data:/var/lib/postgresql/data"
+      - "./healthchecks:/healthchecks"
+    healthcheck:
+      test: /healthchecks/postgres.sh
+      interval: "5s"
+    networks:
+      - humansbestfriend-network
+
+volumes:
+  db-data:
+
+networks:
+  humansbestfriend-network:
